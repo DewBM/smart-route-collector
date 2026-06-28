@@ -1,0 +1,24 @@
+# ── .NET Backend ──────────────────────────────────────────────
+backend/bin/
+backend/obj/
+backend/appsettings.json
+backend/.vs/
+backend/*.user
+backend/.idea/
+
+# ── Flutter Mobile ────────────────────────────────────────────
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.idea/
+mobile/*.iml
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/google-services.json
+
+# ── General ───────────────────────────────────────────────────
+.DS_Store
+*.log
+.env
