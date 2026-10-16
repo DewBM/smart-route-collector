@@ -23,8 +23,13 @@ SendResult _resultFor(int status) {
 }
 
 class ApiService {
-  static const String baseUrl =
-      'https://smart-route-backend-production.up.railway.app';
+  /// Defaults to the hosted backend. Override for local development, e.g.
+  /// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5082`
+  /// (10.0.2.2 is the host machine as seen from the Android emulator).
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://smart-route-backend-production.up.railway.app',
+  );
 
   Future<Trip> fetchTodaysTrip() async {
     final response = await http.get(Uri.parse('$baseUrl/api/trips/today'));
