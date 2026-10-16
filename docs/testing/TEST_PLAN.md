@@ -14,7 +14,7 @@ Legend: **P** = pass, **F** = fail, **-** = not tested. IDs are stable, so you c
 ```bash
 cd backend
 
-# 1. Apply all migrations (4 are new: skip, photo, supplier contact, signature)
+# 1. Apply all migrations (5 are new: skip, photo, supplier contact, signature, unique barcode)
 dotnet ef database update
 
 # 2. First run: create depot + 10 suppliers, 10 days of history, and a clean trip for today
@@ -265,6 +265,7 @@ TRIP=$(curl -s $API/api/trips/today | python3 -c "import sys,json;print(json.loa
 | API-21 | `curl -s -o /dev/null -w '%{http_code}' $API/api/collections/photo/$TRIP/1` | 200 with the image after upload; 404 if none. | |
 | API-22 | Upload a **JPEG** as a signature. | 400 "must be a PNG". | |
 | API-23 | `curl -s -F tripId=$TRIP -F supplierId=1 -F signerName=Test -F file=@docs/testing/barcodes/GL-SUP-001.png $API/api/collections/signature` | 200; `signedBy` appears in the summary. | |
+| DB-1 | `psql -d <db> -c "insert into \"Suppliers\" (\"Name\",\"Latitude\",\"Longitude\",\"BarcodeRef\",\"ExpectedClearKg\",\"ExpectedColouredKg\",\"CollectionDays\") values ('Dup',7.4,80.3,'GL-SUP-001',1,1,'Monday')"` | `ERROR: duplicate key value violates unique constraint "IX_Suppliers_BarcodeRef"`; the supplier count is unchanged. | |
 | API-24 | `POST /api/collections/sync` with 3 stops in a body. | All three Collected; the trip ends complete when all stops are done. | |
 
 ## Z. Robustness and regression
