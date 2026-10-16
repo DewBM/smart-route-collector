@@ -39,6 +39,18 @@ dependencies:
   path: ^1.9.1
   provider: ^6.1.5+1
   mobile_scanner: ^7.2.0
+  flutter_animate: ^4.5.2
+  shimmer: ^4.0.0
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  fl_chart: ^1.2.0
+  url_launcher: ^6.3.2
+  image_picker: ^1.2.3
+  path_provider: ^2.1.6
+  http_parser: ^4.1.2
+  connectivity_plus: ^7.3.1
+  pdf: ^3.13.1
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +62,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -61,6 +75,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -92,3 +111,19 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/brand/icon.png
+  adaptive_icon_background: "#4F46E5"
+  adaptive_icon_foreground: assets/brand/icon_foreground.png
+
+flutter_native_splash:
+  color: "#F7F8FC"
+  color_dark: "#0B1020"
+  image: assets/brand/splash.png
+  android_12:
+    color: "#4F46E5"
+    icon_background_color: "#4F46E5"
+    image: assets/brand/icon_foreground.png
