@@ -180,6 +180,9 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BarcodeRef")
+                        .IsUnique();
+
                     b.ToTable("Suppliers");
                 });
 

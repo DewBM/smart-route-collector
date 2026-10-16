@@ -22,6 +22,12 @@ public class AppDbContext : DbContext
             .WithOne(c => c.TripStop)
             .HasForeignKey<Collection>(c => c.TripStopId);
 
+        // The barcode is the only way to identify a supplier at a stop, so two
+        // suppliers must never share one.
+        modelBuilder.Entity<Supplier>()
+            .HasIndex(s => s.BarcodeRef)
+            .IsUnique();
+
         modelBuilder.Entity<CollectionPhoto>(e =>
         {
             e.HasKey(p => p.CollectionId);
