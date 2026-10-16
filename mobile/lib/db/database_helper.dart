@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/trip_stop.dart';
 import '../models/collection_record.dart';
+import '../models/skip_record.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -23,8 +24,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 5,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -41,7 +43,12 @@ class DatabaseHelper {
         expectedColouredKg REAL NOT NULL,
         status TEXT NOT NULL,
         stopOrder INTEGER NOT NULL,
-        distanceFromPrevKm REAL NOT NULL
+        distanceFromPrevKm REAL NOT NULL,
+        skipReason TEXT,
+        address TEXT,
+        contactName TEXT,
+        phone TEXT,
+        notes TEXT
       )
     ''');
 
@@ -54,7 +61,12 @@ class DatabaseHelper {
         colouredKg REAL NOT NULL,
         condition TEXT NOT NULL,
         collectedAt TEXT NOT NULL,
-        synced INTEGER NOT NULL DEFAULT 0
+        synced INTEGER NOT NULL DEFAULT 0,
+        photoPath TEXT,
+        photoSynced INTEGER NOT NULL DEFAULT 0,
+        signaturePath TEXT,
+        signerName TEXT,
+        signatureSynced INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -66,9 +78,53 @@ class DatabaseHelper {
         totalDistanceKm REAL NOT NULL
       )
     ''');
+
+    await _createSkipsTable(db);
   }
 
-  Future<void> cacheTripStops(int tripId, String tripDate, double totalDistanceKm, List<TripStop> stops) async {
+  Future<void> _createSkipsTable(Database db) => db.execute('''
+      CREATE TABLE skips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tripId INTEGER NOT NULL,
+        supplierId INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        note TEXT,
+        skippedAt TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE trip_stops ADD COLUMN skipReason TEXT');
+      await _createSkipsTable(db);
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE collections ADD COLUMN signaturePath TEXT');
+      await db.execute('ALTER TABLE collections ADD COLUMN signerName TEXT');
+      await db.execute(
+        'ALTER TABLE collections ADD COLUMN signatureSynced INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 4) {
+      for (final col in ['address', 'contactName', 'phone', 'notes']) {
+        await db.execute('ALTER TABLE trip_stops ADD COLUMN $col TEXT');
+      }
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE collections ADD COLUMN photoPath TEXT');
+      await db.execute(
+        'ALTER TABLE collections ADD COLUMN photoSynced INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+  }
+
+  Future<void> cacheTripStops(
+    int tripId,
+    String tripDate,
+    double totalDistanceKm,
+    List<TripStop> stops,
+  ) async {
     final db = await database;
 
     await db.delete('trip_stops');
@@ -134,16 +190,86 @@ class DatabaseHelper {
     return maps.map((m) => CollectionRecord.fromMap(m)).toList();
   }
 
+  Future<List<CollectionRecord>> getPendingPhotos() async {
+    final db = await database;
+    final maps = await db.query(
+      'collections',
+      where: 'photoPath IS NOT NULL AND photoSynced = 0',
+    );
+    return maps.map((m) => CollectionRecord.fromMap(m)).toList();
+  }
+
+  Future<void> markPhotoSynced(int supplierId) async {
+    final db = await database;
+    await db.update(
+      'collections',
+      {'photoSynced': 1},
+      where: 'supplierId = ?',
+      whereArgs: [supplierId],
+    );
+  }
+
+  Future<List<CollectionRecord>> getPendingSignatures() async {
+    final db = await database;
+    final maps = await db.query(
+      'collections',
+      where: 'signaturePath IS NOT NULL AND signatureSynced = 0',
+    );
+    return maps.map((m) => CollectionRecord.fromMap(m)).toList();
+  }
+
+  Future<void> markSignatureSynced(int supplierId) async {
+    final db = await database;
+    await db.update(
+      'collections',
+      {'signatureSynced': 1},
+      where: 'supplierId = ?',
+      whereArgs: [supplierId],
+    );
+  }
+
   Future<List<CollectionRecord>> getAllCollections() async {
     final db = await database;
     final maps = await db.query('collections');
     return maps.map((m) => CollectionRecord.fromMap(m)).toList();
   }
 
+  Future<void> markStopSkipped(int supplierId, String reason) async {
+    final db = await database;
+    await db.update(
+      'trip_stops',
+      {'status': 'Skipped', 'skipReason': reason},
+      where: 'supplierId = ?',
+      whereArgs: [supplierId],
+    );
+  }
+
+  Future<void> insertSkip(SkipRecord record) async {
+    final db = await database;
+    await db.insert('skips', record.toMap());
+  }
+
+  Future<List<SkipRecord>> getPendingSkips() async {
+    final db = await database;
+    final maps = await db.query(
+      'skips',
+      where: 'synced = ?',
+      whereArgs: [0],
+      orderBy: 'skippedAt ASC',
+    );
+    return maps.map(SkipRecord.fromMap).toList();
+  }
+
+  Future<void> markSkipSynced(int id) async {
+    final db = await database;
+    await db.update('skips', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> clearAll() async {
     final db = await database;
     await db.delete('trip_stops');
     await db.delete('collections');
+    await db.delete('skips');
     await db.delete('trip_cache');
   }
 }

@@ -9,6 +9,11 @@ class TripStop {
   String status;
   final int stopOrder;
   final double distanceFromPrevKm;
+  String? skipReason;
+  final String? address;
+  final String? contactName;
+  final String? phone;
+  final String? notes;
 
   TripStop({
     required this.supplierId,
@@ -21,6 +26,11 @@ class TripStop {
     required this.status,
     required this.stopOrder,
     required this.distanceFromPrevKm,
+    this.skipReason,
+    this.address,
+    this.contactName,
+    this.phone,
+    this.notes,
   });
 
   factory TripStop.fromJson(Map<String, dynamic> json) {
@@ -35,6 +45,11 @@ class TripStop {
       status: json['status'] as String,
       stopOrder: json['stopOrder'] as int,
       distanceFromPrevKm: (json['distanceFromPrevKm'] as num).toDouble(),
+      skipReason: json['skipReason'] as String?,
+      address: json['address'] as String?,
+      contactName: json['contactName'] as String?,
+      phone: json['phone'] as String?,
+      notes: json['notes'] as String?,
     );
   }
 
@@ -50,6 +65,11 @@ class TripStop {
       'status': status,
       'stopOrder': stopOrder,
       'distanceFromPrevKm': distanceFromPrevKm,
+      'skipReason': skipReason,
+      'address': address,
+      'contactName': contactName,
+      'phone': phone,
+      'notes': notes,
     };
   }
 
@@ -65,6 +85,11 @@ class TripStop {
       status: map['status'] as String,
       stopOrder: map['stopOrder'] as int,
       distanceFromPrevKm: map['distanceFromPrevKm'] as double,
+      skipReason: map['skipReason'] as String?,
+      address: map['address'] as String?,
+      contactName: map['contactName'] as String?,
+      phone: map['phone'] as String?,
+      notes: map['notes'] as String?,
     );
   }
 }
