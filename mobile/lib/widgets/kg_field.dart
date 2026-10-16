@@ -68,6 +68,9 @@ class KgField extends StatelessWidget {
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^\d{0,5}\.?\d{0,2}')),
           ],
+          // After the first mistake, re-check while typing so the error clears
+          // as soon as the value is valid.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           onChanged: (_) => onChanged?.call(),
           decoration: InputDecoration(
             hintText: '0',

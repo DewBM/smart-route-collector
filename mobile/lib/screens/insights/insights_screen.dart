@@ -143,6 +143,8 @@ class _StatGrid extends StatelessWidget {
     ];
 
     return GridView.count(
+      // Without this the grid adds the status-bar inset as top padding.
+      padding: EdgeInsets.zero,
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -251,13 +253,13 @@ class _DailyChart extends StatelessWidget {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 36,
+                        reservedSize: 40,
                         getTitlesWidget: (v, meta) => v == meta.max
                             ? const SizedBox.shrink()
                             : SideTitleWidget(
                                 meta: meta,
                                 child: Text(
-                                  formatKg(v),
+                                  _compactKg(v),
                                   style: context.text.labelSmall?.copyWith(
                                     color: context.colors.onSurfaceVariant,
                                     fontWeight: FontWeight.w500,
@@ -495,4 +497,11 @@ class _Skeleton extends StatelessWidget {
       SkeletonBox(height: 110, radius: Corners.lg),
     ],
   );
+}
+
+/// 1500 -> "1.5k", 1000 -> "1k", 250 -> "250". Keeps axis labels on one line.
+String _compactKg(double v) {
+  if (v < 1000) return formatKg(v);
+  final k = v / 1000;
+  return '${k == k.roundToDouble() ? k.toStringAsFixed(0) : k.toStringAsFixed(1)}k';
 }
