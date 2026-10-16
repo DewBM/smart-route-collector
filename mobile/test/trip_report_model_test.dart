@@ -2,19 +2,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_route/models/trip_report.dart';
 import 'package:smart_route/services/report_pdf_service.dart';
 
-Map<String, dynamic> _stop(String name, String status,
-        {double clear = 0, double coloured = 0, bool skipped = false}) =>
-    {
-      'supplierName': name,
-      'condition': null,
-      'collectedClearKg': clear,
-      'collectedColouredKg': coloured,
-      'expectedClearKg': 45,
-      'expectedColouredKg': 18,
-      'skipped': skipped,
-      'status': status,
-      'belowExpected': false,
-    };
+Map<String, dynamic> _stop(
+  String name,
+  String status, {
+  double clear = 0,
+  double coloured = 0,
+  bool skipped = false,
+}) => {
+  'supplierName': name,
+  'condition': null,
+  'collectedClearKg': clear,
+  'collectedColouredKg': coloured,
+  'expectedClearKg': 45,
+  'expectedColouredKg': 18,
+  'skipped': skipped,
+  'status': status,
+  'belowExpected': false,
+};
 
 void main() {
   test('stops that were not visited are never counted as shortfalls', () {
