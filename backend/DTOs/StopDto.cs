@@ -12,4 +12,9 @@ public class StopDto
     public string Status { get; set; } = string.Empty;
     public int StopOrder { get; set; }
     public double DistanceFromPrevKm { get; set; }
+    public string? SkipReason { get; set; }
+    public string? Address { get; set; }
+    public string? ContactName { get; set; }
+    public string? Phone { get; set; }
+    public string? Notes { get; set; }
 }

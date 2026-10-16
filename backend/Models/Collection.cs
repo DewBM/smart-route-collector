@@ -9,6 +9,9 @@ public class Collection
     public string Condition { get; set; } = string.Empty;
     public DateTime CollectedAt { get; set; }
     public bool Synced { get; set; } = false;
+    public bool HasPhoto { get; set; } = false;
+    public bool HasSignature { get; set; } = false;
+    public string? SignedBy { get; set; }
 
     public TripStop TripStop { get; set; } = null!;
 }

@@ -10,6 +10,10 @@ public class Supplier
     public double ExpectedClearKg { get; set; }
     public double ExpectedColouredKg { get; set; }
     public string CollectionDays { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? ContactName { get; set; }
+    public string? Phone { get; set; }
+    public string? Notes { get; set; }
 
     public ICollection<TripStop> TripStops { get; set; } = new List<TripStop>();
 }

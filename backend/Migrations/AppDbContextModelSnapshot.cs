@@ -43,6 +43,15 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("HasPhoto")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasSignature")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SignedBy")
+                        .HasColumnType("text");
+
                     b.Property<bool>("Synced")
                         .HasColumnType("boolean");
 
@@ -55,6 +64,51 @@ namespace backend.Migrations
                         .IsUnique();
 
                     b.ToTable("Collections");
+                });
+
+            modelBuilder.Entity("backend.Models.CollectionPhoto", b =>
+                {
+                    b.Property<int>("CollectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CollectionId");
+
+                    b.ToTable("CollectionPhotos");
+                });
+
+            modelBuilder.Entity("backend.Models.CollectionSignature", b =>
+                {
+                    b.Property<int>("CollectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("SignerName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CollectionId");
+
+                    b.ToTable("CollectionSignatures");
                 });
 
             modelBuilder.Entity("backend.Models.Depot", b =>
@@ -88,12 +142,18 @@ namespace backend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Address")
+                        .HasColumnType("text");
+
                     b.Property<string>("BarcodeRef")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("CollectionDays")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContactName")
                         .HasColumnType("text");
 
                     b.Property<double>("ExpectedClearKg")
@@ -110,6 +170,12 @@ namespace backend.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -158,6 +224,15 @@ namespace backend.Migrations
                     b.Property<double>("DistanceFromPrevKm")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("SkipNote")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SkipReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("SkippedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -191,6 +266,28 @@ namespace backend.Migrations
                         .IsRequired();
 
                     b.Navigation("TripStop");
+                });
+
+            modelBuilder.Entity("backend.Models.CollectionPhoto", b =>
+                {
+                    b.HasOne("backend.Models.Collection", "Collection")
+                        .WithOne()
+                        .HasForeignKey("backend.Models.CollectionPhoto", "CollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Collection");
+                });
+
+            modelBuilder.Entity("backend.Models.CollectionSignature", b =>
+                {
+                    b.HasOne("backend.Models.Collection", "Collection")
+                        .WithOne()
+                        .HasForeignKey("backend.Models.CollectionSignature", "CollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Collection");
                 });
 
             modelBuilder.Entity("backend.Models.Trip", b =>

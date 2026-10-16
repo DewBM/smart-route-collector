@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import '../../providers/trip_provider.dart';
 import '../../models/trip_stop.dart';
+import '../../providers/trip_provider.dart';
+import '../../theme/app_tokens.dart';
+import '../../utils/format.dart';
+import '../../widgets/hero_header.dart';
+import '../../widgets/primary_button.dart';
+import '../../widgets/progress_ring.dart';
+import '../../widgets/state_views.dart';
+import '../../widgets/stat_tile.dart';
 import '../scan_collect/scan_collect_screen.dart';
 import '../trip_report/trip_report_screen.dart';
+import '../../utils/navigation.dart';
+import '../../utils/routes.dart';
+import 'route_map_screen.dart';
+import 'supplier_sheet.dart';
+import 'stop_timeline_tile.dart';
 
 class TripSequenceScreen extends StatefulWidget {
   const TripSequenceScreen({super.key});
@@ -21,261 +34,231 @@ class _TripSequenceScreenState extends State<TripSequenceScreen> {
     });
   }
 
+  Future<void> _openScan(TripStop stop) async {
+    await Navigator.push(context, appRoute(ScanCollectScreen(stop: stop)));
+    if (mounted) context.read<TripProvider>().loadTrip();
+  }
+
+  void _openReport() =>
+      Navigator.push(context, appRoute(const TripReportScreen()));
+
   @override
   Widget build(BuildContext context) {
-    final tripProvider = context.watch<TripProvider>();
-    final theme = Theme.of(context);
+    final trip = context.watch<TripProvider>();
+    final hasData = trip.stops.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Today\'s Route'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<TripProvider>().loadTrip(),
+      body: Column(
+        children: [
+          _Header(
+            trip: trip,
+            onMap: () =>
+                Navigator.push(context, appRoute(const RouteMapScreen())),
           ),
+          Expanded(child: _buildBody(trip, hasData)),
         ],
       ),
-      body: _buildBody(tripProvider, theme),
+      bottomNavigationBar: trip.isTripComplete
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(Gap.lg),
+                child: PrimaryButton(
+                  label: 'View trip report',
+                  icon: Icons.assessment_rounded,
+                  onPressed: _openReport,
+                ),
+              ),
+            ).animate().slideY(begin: 1, end: 0, duration: 400.ms).fadeIn()
+          : null,
     );
   }
 
-  Widget _buildBody(TripProvider tripProvider, ThemeData theme) {
-    if (tripProvider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+  Widget _buildBody(TripProvider trip, bool hasData) {
+    // Keep showing the previous data during a background refresh.
+    if (trip.isLoading && !hasData) return const _Skeleton();
+
+    if (trip.error != null && !hasData) {
+      return ErrorState(message: trip.error!, onRetry: trip.loadTrip);
     }
 
-    if (tripProvider.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wifi_off, size: 48, color: theme.colorScheme.error),
-              const SizedBox(height: 16),
-              Text(
-                tripProvider.error!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => context.read<TripProvider>().loadTrip(),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+    if (!hasData) {
+      return const EmptyState(
+        title: 'No stops today',
+        message: 'There are no suppliers scheduled for collection today.',
       );
     }
 
-    if (tripProvider.stops.isEmpty) {
-      return const Center(child: Text('No stops scheduled for today.'));
-    }
-
-    return Column(
-      children: [
-        _buildTripSummaryCard(tripProvider, theme),
-        Expanded(
-          child: ListView.builder(
-            itemCount: tripProvider.stops.length,
-            itemBuilder: (context, index) {
-              final stop = tripProvider.stops[index];
-              return _buildStopCard(stop, tripProvider, theme);
-            },
-          ),
-        ),
-        if (tripProvider.isTripComplete)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const TripReportScreen(),
-                  ),
-                ),
-                child: const Text('View Trip Report'),
-              ),
-            ),
-          ),
-      ],
-    );
+    return _TimelineList(trip: trip, onScan: _openScan);
   }
+}
 
-  Widget _buildTripSummaryCard(TripProvider tripProvider, ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Total Distance',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )),
-                  Text(
-                    '${tripProvider.trip?.totalDistanceKm.toStringAsFixed(1)} km',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Remaining Stops',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )),
-                  Text(
-                    '${tripProvider.remainingStops}',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _Header extends StatelessWidget {
+  const _Header({required this.trip, required this.onMap});
 
-  Widget _buildStopCard(TripStop stop, TripProvider tripProvider, ThemeData theme) {
-    final isNext = stop.status == 'Next';
-    final isCollected = stop.status == 'Collected';
+  final TripProvider trip;
+  final VoidCallback onMap;
 
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isNext
-            ? BorderSide(color: theme.colorScheme.primary, width: 2)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: isNext
-            ? () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ScanCollectScreen(stop: stop),
-                  ),
-                );
-                if (mounted) {
-                  context.read<TripProvider>().loadTrip();
-                }
-              }
-            : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+  @override
+  Widget build(BuildContext context) {
+    final total = trip.stops.length;
+    final done = trip.finishedStops;
+    final date = trip.trip == null ? '' : formatTripDate(trip.trip!.tripDate);
+
+    return HeroHeader(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _buildStopNumber(stop, isNext, isCollected, theme),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      stop.supplierName,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+                      date.isEmpty ? 'Glassline' : date.toUpperCase(),
+                      style: context.text.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
-                      '${stop.distanceFromPrevKm.toStringAsFixed(1)} km from previous',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      "Today's route",
+                      style: context.text.headlineMedium?.copyWith(
+                        color: Colors.white,
                       ),
                     ),
                   ],
                 ),
               ),
-              _buildStatusBadge(stop.status, theme),
+              IconButton.filledTonal(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  foregroundColor: Colors.white,
+                ),
+                tooltip: 'Route overview',
+                onPressed: trip.stops.isEmpty ? null : onMap,
+                icon: const Icon(Icons.map_rounded),
+              ),
+              const SizedBox(width: Gap.sm),
+              IconButton.filledTonal(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  foregroundColor: Colors.white,
+                ),
+                tooltip: 'Refresh',
+                onPressed: trip.isLoading ? null : trip.loadTrip,
+                icon: trip.isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStopNumber(TripStop stop, bool isNext, bool isCollected, ThemeData theme) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: isCollected
-            ? theme.colorScheme.primary
-            : isNext
-                ? theme.colorScheme.primaryContainer
-                : theme.colorScheme.surfaceVariant,
-      ),
-      child: Center(
-        child: isCollected
-            ? Icon(Icons.check, color: theme.colorScheme.onPrimary, size: 20)
-            : Text(
-                '${stop.stopOrder}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isNext
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: Gap.xl),
+          Row(
+            children: [
+              ProgressRing(
+                semanticsLabel: '$done of $total stops done',
+                progress: total == 0 ? 0 : done / total,
+                center: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$done/$total',
+                      style: context.text.titleLarge?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'stops',
+                      style: context.text.labelSmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: Gap.xl),
+              Expanded(
+                child: StatTile(
+                  onHero: true,
+                  icon: Icons.route_rounded,
+                  value:
+                      '${trip.trip?.totalDistanceKm.toStringAsFixed(1) ?? '--'} km',
+                  label: 'Total distance',
+                ),
+              ),
+              Expanded(
+                child: StatTile(
+                  onHero: true,
+                  icon: Icons.flag_rounded,
+                  value: '${trip.remainingStops}',
+                  label: 'Remaining',
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildStatusBadge(String status, ThemeData theme) {
-    Color bgColor;
-    Color textColor;
+class _TimelineList extends StatelessWidget {
+  const _TimelineList({required this.trip, required this.onScan});
 
-    switch (status) {
-      case 'Next':
-        bgColor = theme.colorScheme.primaryContainer;
-        textColor = theme.colorScheme.onPrimaryContainer;
-        break;
-      case 'Collected':
-        bgColor = theme.colorScheme.primary;
-        textColor = theme.colorScheme.onPrimary;
-        break;
-      default:
-        bgColor = theme.colorScheme.surfaceVariant;
-        textColor = theme.colorScheme.onSurfaceVariant;
-    }
+  final TripProvider trip;
+  final ValueChanged<TripStop> onScan;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+  @override
+  Widget build(BuildContext context) {
+    final stops = trip.stops;
+    return RefreshIndicator(
+      onRefresh: trip.loadTrip,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.md, Gap.lg, Gap.xxl),
+        itemCount: stops.length,
+        itemBuilder: (context, i) {
+          final stop = stops[i];
+          return StopTimelineTile(
+                stop: stop,
+                isFirst: i == 0,
+                isLast: i == stops.length - 1,
+                onScan: () => onScan(stop),
+                onNavigate: () => navigateToStop(context, stop),
+                onTap: () => showSupplierSheet(context, stop),
+              )
+              .animate()
+              .fadeIn(delay: (60 * i).ms, duration: 300.ms)
+              .slideY(begin: 0.08, end: 0, delay: (60 * i).ms);
+        },
       ),
-      child: Text(
-        status,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    );
+  }
+}
+
+class _Skeleton extends StatelessWidget {
+  const _Skeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(Gap.lg),
+      children: [
+        const SkeletonBox(height: 44, radius: Corners.pill),
+        const SizedBox(height: Gap.xl),
+        for (var i = 0; i < 4; i++) ...[
+          const SkeletonBox(height: 92, radius: Corners.lg),
+          const SizedBox(height: Gap.md),
+        ],
+      ],
     );
   }
 }
