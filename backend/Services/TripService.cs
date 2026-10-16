@@ -31,7 +31,7 @@ public class TripService
         return await CreateTripAsync(today);
     }
 
-    private async Task<Trip> CreateTripAsync(DateOnly date)
+    public async Task<Trip> CreateTripAsync(DateOnly date)
     {
         var depot = await _db.Depots.FirstOrDefaultAsync()
             ?? throw new Exception("No depot found in database.");
@@ -102,22 +102,137 @@ public class TripService
             .FirstAsync(t => t.Id == trip.Id);
     }
 
-    public async Task AdvanceNextStopAsync(int tripId, int completedSupplierId)
+    public enum RecordResult { Recorded, AlreadyRecorded, StopNotFound, StopSkipped }
+
+    /// <summary>
+    /// Records a collection for a stop and marks it Collected. Accepts any stop
+    /// that is still to be visited, not only the server's current "Next": a
+    /// collector working offline may legitimately visit stops in a different
+    /// order than the server last computed. Idempotent, so offline retries are safe.
+    /// </summary>
+    public async Task<RecordResult> RecordCollectionAsync(
+        int tripId, int supplierId, double clearKg, double colouredKg, string condition, DateTime collectedAt)
     {
-        var completedStop = await _db.TripStops
-            .FirstOrDefaultAsync(ts => ts.TripId == tripId && ts.SupplierId == completedSupplierId)
-            ?? throw new Exception("Stop not found.");
+        var stop = await _db.TripStops
+            .FirstOrDefaultAsync(ts => ts.TripId == tripId && ts.SupplierId == supplierId);
 
-        completedStop.Status = "Collected";
+        if (stop == null)
+            return RecordResult.StopNotFound;
 
-        var nextStop = await _db.TripStops
-            .Where(ts => ts.TripId == tripId && ts.Status == "Pending")
+        if (await _db.Collections.AnyAsync(c => c.TripStopId == stop.Id))
+            return RecordResult.AlreadyRecorded;
+
+        if (stop.Status == "Skipped")
+            return RecordResult.StopSkipped;
+
+        _db.Collections.Add(new Collection
+        {
+            TripStopId = stop.Id,
+            ClearKg = clearKg,
+            ColouredKg = colouredKg,
+            Condition = condition,
+            CollectedAt = collectedAt,
+            Synced = true
+        });
+
+        stop.Status = "Collected";
+        await _db.SaveChangesAsync();
+        await EnsureNextStopAsync(tripId);
+        return RecordResult.Recorded;
+    }
+
+    /// <summary>Makes sure exactly one unfinished stop is "Next" (if any remain).</summary>
+    private async Task EnsureNextStopAsync(int tripId)
+    {
+        var open = await _db.TripStops
+            .Where(ts => ts.TripId == tripId && (ts.Status == "Pending" || ts.Status == "Next"))
             .OrderBy(ts => ts.StopOrder)
-            .FirstOrDefaultAsync();
+            .ToListAsync();
 
-        if (nextStop != null)
-            nextStop.Status = "Next";
+        if (open.Count == 0)
+            return;
+
+        var next = open.FirstOrDefault(ts => ts.Status == "Next") ?? open[0];
+        foreach (var ts in open)
+            ts.Status = ts == next ? "Next" : "Pending";
 
         await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Marks a stop as skipped and, when it was the current stop, re-runs the
+    /// route optimisation (Dijkstra over Haversine distances) for the stops
+    /// that are still to be visited, starting from the skipped stop's location.
+    /// Idempotent: skipping an already skipped stop is a no-op.
+    /// </summary>
+    public async Task<Trip> SkipStopAsync(int tripId, int supplierId, string reason, string? note, DateTime? skippedAt)
+    {
+        var trip = await _db.Trips
+            .Include(t => t.TripStops).ThenInclude(ts => ts.Supplier)
+            .FirstOrDefaultAsync(t => t.Id == tripId)
+            ?? throw new KeyNotFoundException("Trip not found.");
+
+        var target = trip.TripStops.FirstOrDefault(ts => ts.SupplierId == supplierId)
+            ?? throw new KeyNotFoundException("Trip stop not found.");
+
+        if (target.Status == "Skipped")
+            return trip;
+
+        if (target.Status == "Collected")
+            throw new InvalidOperationException("This stop has already been collected.");
+
+        var wasNext = target.Status == "Next";
+        target.Status = "Skipped";
+        target.SkipReason = reason;
+        target.SkipNote = note;
+        target.SkippedAt = skippedAt ?? DateTime.UtcNow;
+
+        // Finished stops keep their order; the skipped stop joins the end of them.
+        var finished = trip.TripStops
+            .Where(ts => ts != target && (ts.Status == "Collected" || ts.Status == "Skipped"))
+            .OrderBy(ts => ts.StopOrder)
+            .ToList();
+        finished.Add(target);
+
+        var remaining = trip.TripStops
+            .Where(ts => ts.Status == "Pending" || ts.Status == "Next")
+            .OrderBy(ts => ts.StopOrder)
+            .ToList();
+
+        if (remaining.Count > 0 && wasNext)
+        {
+            const int originId = -1;
+            var nodes = new List<(int Id, double Lat, double Lon)>
+            {
+                (originId, target.Supplier.Latitude, target.Supplier.Longitude)
+            };
+            nodes.AddRange(remaining.Select(ts => (ts.SupplierId, ts.Supplier.Latitude, ts.Supplier.Longitude)));
+
+            var order = _routeService.GetOptimalRoute(originId, nodes);
+            remaining = order.Select(id => remaining.First(ts => ts.SupplierId == id)).ToList();
+
+            var prevLat = target.Supplier.Latitude;
+            var prevLon = target.Supplier.Longitude;
+            foreach (var ts in remaining)
+            {
+                ts.DistanceFromPrevKm = _routeService.Haversine(
+                    prevLat, prevLon, ts.Supplier.Latitude, ts.Supplier.Longitude);
+                ts.Status = "Pending";
+                prevLat = ts.Supplier.Latitude;
+                prevLon = ts.Supplier.Longitude;
+            }
+        }
+
+        // Ensure exactly one stop is "Next".
+        if (remaining.Count > 0 && remaining.All(ts => ts.Status != "Next"))
+            remaining[0].Status = "Next";
+
+        var position = 1;
+        foreach (var ts in finished.Concat(remaining))
+            ts.StopOrder = position++;
+
+        trip.TotalDistanceKm = trip.TripStops.Sum(ts => ts.DistanceFromPrevKm);
+        await _db.SaveChangesAsync();
+        return trip;
     }
 }
